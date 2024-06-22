@@ -62,7 +62,9 @@ export const getImageFileElementFromUrl = async (
 
     const imageFileArrayBuffer = await imageFileObject.arrayBuffer();
 
-    return Buffer.from(imageFileArrayBuffer);
+    const uint8array = new Uint8Array(imageFileArrayBuffer);
+
+    return Buffer.from(uint8array);
   } catch (err) {
     return;
   }

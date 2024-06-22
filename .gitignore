@@ -2,3 +2,6 @@ node_modules
 
 .env
 .env.*
+
+src/assets/images/**/*
+!src/assets/images/.gitkeep

@@ -16,16 +16,23 @@ const main = async () => {
   });
   const page = await browser.newPage();
 
-  page.setDefaultTimeout(1000 * 60 * 5);
-  page.setDefaultNavigationTimeout(1000 * 60 * 5);
+  let pageUrl: string = page.url();
+
+  page.on("response", (response) => {
+    pageUrl = response.url();
+  });
+
+  page.setDefaultTimeout(1000 * 60 * 0);
+  page.setDefaultNavigationTimeout(1000 * 60 * 0);
 
   await page.goto(
     "https://www.stylus.co.ao/encomendas/pt/inicio-de-sessao?back=my-account"
   );
 
   const loginDone = (): boolean => {
-    console.log("Page url after login => ", new URL(page.url()).pathname);
-    return new URL(page.url()).pathname.replace(/\/$/, "") === "/encomendas/pt";
+    // console.log("Page url after login => ", new URL(pageUrl).pathname);
+    // return new URL(pageUrl).pathname.replace(/\/$/, "") === "/encomendas/pt";
+    return true;
   };
 
   const EMAIL_FIELD_ID = "email";
@@ -82,6 +89,10 @@ const main = async () => {
 
         await searchButtonElement.click();
 
+        await page.waitForNavigation({
+          waitUntil: "load",
+        });
+
         const productPageLinkElement = await page.waitForSelector(
           "h4.name > a.product-name"
         );
@@ -97,7 +108,23 @@ const main = async () => {
           continue;
         }
 
-        await productPageLinkElement.click();
+        const productPageUrl = (
+          await productPageLinkElement.getProperty("href")
+        )
+          .toString()
+          .replace(/^(JSHandle:)/i, "");
+
+        console.log(`[${product.name}] product page url: ${productPageUrl}`);
+
+        // productPageLinkElement.clickablePoint
+
+        // await productPageLinkElement.click();
+
+        await page.goto(productPageUrl);
+
+        // await page.waitForNavigation({
+        //   waitUntil: "load",
+        // });
 
         console.log(`[${product.name}] Getting main image url...`);
 
@@ -109,14 +136,23 @@ const main = async () => {
           console.log(`[${product.name}] Getting main image buffer object...`);
 
           const mainImageButterObject = await getImageFileElementFromUrl(
-            mainImageUrl.toString()
+            mainImageUrl.toString().replace(/^(JSHandle:)/i, "")
           );
+
+          const sanitizedProductName = product.name.replaceAll(
+            /[^a-zA-Z0-9_-]/g,
+            ""
+          );
+
+          const imageName = `[${Date.now()}] ${sanitizedProductName} - (${
+            product.code
+          }).jpg`;
 
           const imagePath = path.resolve(
             __dirname,
             "assets",
             "images",
-            `[${Date.now()}] ${product.name} - (${product.code}).jpg`
+            imageName
           );
 
           if (!mainImageButterObject) {
@@ -128,7 +164,6 @@ const main = async () => {
           }
 
           console.log(`[${product.name}] Saving image...`);
-
           // @ts-ignore
           await fs.writeFile(imagePath, mainImageButterObject);
 
