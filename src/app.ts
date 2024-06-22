@@ -144,9 +144,9 @@ const main = async () => {
             ""
           );
 
-          const imageName = `[${Date.now()}] ${sanitizedProductName} - (${
+          const imageName = `[${Date.now()}] ${sanitizedProductName} - (${encodeURIComponent(
             product.code
-          }).jpg`;
+          )}).jpg`;
 
           const imagePath = path.resolve(
             __dirname,
