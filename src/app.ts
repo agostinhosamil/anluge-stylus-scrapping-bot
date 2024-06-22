@@ -12,7 +12,7 @@ import { getImageFileElementFromUrl, getProducts } from "./utils";
 const main = async () => {
   // Launch the browser and open a new blank page
   const browser = await puppeteer.launch({
-    headless: false,
+    // headless: false,
   });
   const page = await browser.newPage();
 
@@ -59,7 +59,11 @@ const main = async () => {
     if (loginDone()) {
       console.log("Login done >>> Start getting images");
 
+      console.log("\nGetting products data from Anluge store API...\n");
+
       const products = await getProducts();
+
+      console.log(`\n\nGetting images for ${products.length} products...\n\n`);
 
       for (const product of products) {
         console.log(`Product id => ${product.code}`);
@@ -120,7 +124,10 @@ const main = async () => {
 
         // await productPageLinkElement.click();
 
-        await page.goto(productPageUrl);
+        await page.goto(productPageUrl, {
+          waitUntil: "load",
+          timeout: 0,
+        });
 
         // await page.waitForNavigation({
         //   waitUntil: "load",
@@ -139,10 +146,9 @@ const main = async () => {
             mainImageUrl.toString().replace(/^(JSHandle:)/i, "")
           );
 
-          const sanitizedProductName = product.name.replaceAll(
-            /[^a-zA-Z0-9_-]/g,
-            ""
-          );
+          const sanitizedProductName = product.name
+            .replaceAll(/\s+/g, "-")
+            .replaceAll(/[^a-zA-Z0-9_-]/g, "");
 
           const imageName = `[${Date.now()}] ${sanitizedProductName} - (${encodeURIComponent(
             product.code
