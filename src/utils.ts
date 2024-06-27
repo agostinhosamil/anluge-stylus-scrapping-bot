@@ -1,4 +1,6 @@
-import { basename } from "node:path";
+import fs from "fs";
+import { basename, resolve } from "node:path";
+
 import { axios } from "./services/axios";
 
 type Product = {
@@ -9,8 +11,76 @@ type Product = {
 
 type Products = Array<Product>;
 
+const productsCacheFilePath = resolve(__dirname, "cache", "products.json");
+const historyCacheFilePath = resolve(__dirname, "cache", "history.json");
+
+const getProductsFromCache = async (): Promise<Products> => {
+  let productsCacheObject = [];
+
+  try {
+    const productsCacheFileContent = fs.readFileSync(
+      productsCacheFilePath,
+      "utf8"
+    );
+
+    if (/\S/.test(productsCacheFileContent)) {
+      productsCacheObject = JSON.parse(productsCacheFileContent);
+
+      if (!(productsCacheObject instanceof Array)) {
+        productsCacheObject = [productsCacheObject];
+      }
+    }
+  } catch (err) {
+    // pass
+  }
+
+  return productsCacheObject as Products;
+};
+
+type HistoryState = keyof History;
+
+type History = {
+  success: Products;
+  failure: Products;
+};
+
+export const getHistory = (): History => {
+  try {
+    const historyCacheFileData = fs.readFileSync(historyCacheFilePath, "utf8");
+
+    const historyCacheFileDataObject = JSON.parse(historyCacheFileData);
+
+    return historyCacheFileDataObject as History;
+  } catch (err) {
+    return {
+      failure: [],
+      success: [],
+    };
+  }
+};
+
+export const setHistory = (
+  product: Product,
+  state: HistoryState = "success"
+): void => {
+  const historyCacheData = getHistory();
+
+  if (!historyCacheData[state].some(({ code }) => code === product.code)) {
+    historyCacheData[state].push(product);
+
+    fs.writeFileSync(
+      historyCacheFilePath,
+      JSON.stringify(historyCacheData, null, 2)
+    );
+  }
+};
+
 export const getProducts = async (): Promise<Products> => {
-  const products: Array<Product> = [];
+  const products: Array<Product> = await getProductsFromCache();
+
+  if (products.length >= 1) {
+    return products;
+  }
 
   const concurrency = 100;
   let cursor = 0;
@@ -32,6 +102,12 @@ export const getProducts = async (): Promise<Products> => {
       console.log("[Services.Axios] Error: ", err);
     }
   }
+
+  console.log("\n\nCaching products array...\n\n");
+
+  fs.writeFileSync(productsCacheFilePath, JSON.stringify(products, null, 2));
+
+  console.log("\n\nCached products array.\n\n");
 
   return products;
 };

@@ -5,7 +5,12 @@ import puppeteer from "puppeteer";
 
 import { env } from "./config/env";
 // import { testSaveFile } from "./test";
-import { getImageFileElementFromUrl, getProducts } from "./utils";
+import {
+  getHistory,
+  getImageFileElementFromUrl,
+  getProducts,
+  setHistory,
+} from "./utils";
 
 // testSaveFile();
 
@@ -61,125 +66,155 @@ const main = async () => {
 
       console.log("\nGetting products data from Anluge store API...\n");
 
-      const products = await getProducts();
+      const allProducts = await getProducts();
+      const history = getHistory();
 
-      console.log(`\n\nGetting images for ${products.length} products...\n\n`);
+      console.log(
+        `\n\n\nHISTORY\n\n-> Already downloaded images: #${history.success.length}\n-> Failures: #${history.failure.length}\n\n\n`
+      );
+
+      const products = allProducts.filter(
+        (product) => !history.success.some(({ code }) => code === product.code)
+      );
+
+      console.log(`\n\nGetting images for #${products.length} products...\n\n`);
+
+      let index = -1;
 
       for (const product of products) {
-        console.log(`Product id => ${product.code}`);
+        index++;
 
-        // Obter imagem do produto pelo código
-        // enviar imagem para a cdn
+        try {
+          console.log(`\n\n\n\nProduct id => ${product.code} #${index}`);
 
-        // { id: string }
+          // Obter imagem do produto pelo código
+          // enviar imagem para a cdn
 
-        console.log(`[${product.name}] Getting search form field...`);
+          // { id: string }
 
-        const searchInputField = await page.waitForSelector(
-          "form#searchbox div.input-group input#pts_search_query_top"
-        );
+          console.log(`[${product.name}] Getting search form field...`);
 
-        const searchButtonElement = await page.waitForSelector(
-          "form#searchbox div.input-group button.button-search"
-        );
-
-        if (!(searchInputField && searchButtonElement)) {
-          continue;
-        }
-
-        console.log(`[${product.name}] Typing search query...`);
-
-        await searchInputField.type(product.code);
-
-        await searchButtonElement.click();
-
-        await page.waitForNavigation({
-          waitUntil: "load",
-        });
-
-        const productPageLinkElement = await page.waitForSelector(
-          "h4.name > a.product-name"
-        );
-
-        console.log(`[${product.name}] Going to the product page...`);
-
-        if (!productPageLinkElement) {
-          console.log(`[${product.name}] Failed going to the product page...`);
-          console.log(
-            `\n\nCould not find product link element for product '${product.name}'\n\n`
+          const searchInputField = await page.waitForSelector(
+            "form#searchbox div.input-group input#pts_search_query_top"
           );
 
-          continue;
-        }
-
-        const productPageUrl = (
-          await productPageLinkElement.getProperty("href")
-        )
-          .toString()
-          .replace(/^(JSHandle:)/i, "");
-
-        console.log(`[${product.name}] product page url: ${productPageUrl}`);
-
-        // productPageLinkElement.clickablePoint
-
-        // await productPageLinkElement.click();
-
-        await page.goto(productPageUrl, {
-          waitUntil: "load",
-          timeout: 0,
-        });
-
-        // await page.waitForNavigation({
-        //   waitUntil: "load",
-        // });
-
-        console.log(`[${product.name}] Getting main image url...`);
-
-        const mainImageElement = await page.waitForSelector("img#bigpic");
-
-        if (mainImageElement) {
-          const mainImageUrl = await mainImageElement.getProperty("src");
-
-          console.log(`[${product.name}] Getting main image buffer object...`);
-
-          const mainImageButterObject = await getImageFileElementFromUrl(
-            mainImageUrl.toString().replace(/^(JSHandle:)/i, "")
+          const searchButtonElement = await page.waitForSelector(
+            "form#searchbox div.input-group button.button-search"
           );
 
-          const sanitizedProductName = product.name
-            .replaceAll(/\s+/g, "-")
-            .replaceAll(/[^a-zA-Z0-9_-]/g, "");
+          if (!(searchInputField && searchButtonElement)) {
+            setHistory(product, "failure");
+            continue;
+          }
 
-          const imageName = `[${Date.now()}] ${sanitizedProductName} - (${encodeURIComponent(
-            product.code
-          )}).jpg`;
+          console.log(`[${product.name}] Typing search query...`);
 
-          const imagePath = path.resolve(
-            __dirname,
-            "assets",
-            "images",
-            imageName
+          await searchInputField.type(product.code);
+
+          await searchButtonElement.click();
+
+          await page.waitForNavigation({
+            waitUntil: "load",
+          });
+
+          const productPageLinkElement = await page.waitForSelector(
+            "h4.name > a.product-name"
           );
 
-          if (!mainImageButterObject) {
+          console.log(`[${product.name}] Going to the product page...`);
+
+          if (!productPageLinkElement) {
             console.log(
-              `[${product.name}] Failed getting main image buffer object...`
+              `[${product.name}] Failed going to the product page...`
             );
+            console.log(
+              `\n\nCould not find product link element for product '${product.name}'\n\n`
+            );
+
+            setHistory(product, "failure");
 
             continue;
           }
 
-          console.log(`[${product.name}] Saving image...`);
-          // @ts-ignore
-          await fs.writeFile(imagePath, mainImageButterObject);
+          const productPageUrl = (
+            await productPageLinkElement.getProperty("href")
+          )
+            .toString()
+            .replace(/^(JSHandle:)/i, "");
 
-          console.log(
-            `[${product.name}] Saved image at: ${imagePath}`.concat(
-              "\n".repeat(10)
-            )
-          );
+          console.log(`[${product.name}] product page url: ${productPageUrl}`);
 
-          // TODO: Get Image Variants
+          // productPageLinkElement.clickablePoint
+
+          // await productPageLinkElement.click();
+
+          await page.goto(productPageUrl, {
+            waitUntil: "load",
+            timeout: 0,
+          });
+
+          // await page.waitForNavigation({
+          //   waitUntil: "load",
+          // });
+
+          console.log(`[${product.name}] Getting main image url...`);
+
+          const mainImageElement = await page.waitForSelector("img#bigpic");
+
+          if (mainImageElement) {
+            const mainImageUrl = await mainImageElement.getProperty("src");
+
+            console.log(
+              `[${product.name}] Getting main image buffer object...`
+            );
+
+            const mainImageButterObject = await getImageFileElementFromUrl(
+              mainImageUrl.toString().replace(/^(JSHandle:)/i, "")
+            );
+
+            const sanitizedProductName = product.name
+              .replaceAll(/\s+/g, "-")
+              .replaceAll(/[^a-zA-Z0-9_-]/g, "");
+
+            const imageName = `[${Date.now()}] ${sanitizedProductName} - (${encodeURIComponent(
+              product.code
+            )}).jpg`;
+
+            const imagePath = path.resolve(
+              __dirname,
+              "assets",
+              "images",
+              imageName
+            );
+
+            if (!mainImageButterObject) {
+              console.log(
+                `[${product.name}] Failed getting main image buffer object...`
+              );
+
+              setHistory(product, "failure");
+
+              continue;
+            }
+
+            console.log(`[${product.name}] Saving image...`);
+            // @ts-ignore
+            await fs.writeFile(imagePath, mainImageButterObject);
+
+            console.log(
+              `[${product.name}] Saved image at: ${imagePath}`.concat(
+                "\n".repeat(10)
+              )
+            );
+
+            setHistory(product);
+
+            // TODO: Get Image Variants
+          } else {
+            setHistory(product, "failure");
+          }
+        } catch (err) {
+          setHistory(product, "failure");
         }
       }
     } else {
