@@ -8,3 +8,6 @@ src/assets/images/**/*
 
 src/cache/**/*
 !src/cache/.gitkeep
+
+src/logs/**/*
+!src/logs/.gitkeep

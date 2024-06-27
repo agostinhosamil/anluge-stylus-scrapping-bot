@@ -17,18 +17,20 @@ import {
 const main = async () => {
   // Launch the browser and open a new blank page
   const browser = await puppeteer.launch({
-    // headless: false,
+    headless: false,
+    ignoreDefaultArgs: ["--disable-extensions"],
   });
+
   const page = await browser.newPage();
 
-  let pageUrl: string = page.url();
+  // let pageUrl: string = page.url();
 
-  page.on("response", (response) => {
-    pageUrl = response.url();
-  });
+  // page.on("response", (response) => {
+  //   pageUrl = response.url();
+  // });
 
-  page.setDefaultTimeout(1000 * 60 * 0);
-  page.setDefaultNavigationTimeout(1000 * 60 * 0);
+  page.setDefaultTimeout(0);
+  page.setDefaultNavigationTimeout(0);
 
   await page.goto(
     "https://www.stylus.co.ao/encomendas/pt/inicio-de-sessao?back=my-account"
@@ -109,7 +111,19 @@ const main = async () => {
 
           console.log(`[${product.name}] Typing search query...`);
 
-          await searchInputField.type(product.code);
+          await searchInputField.evaluate(() => {
+            const inputField = document.querySelector<HTMLInputElement>(
+              "form#searchbox div.input-group input#pts_search_query_top"
+            );
+
+            if (inputField) {
+              inputField.value = "";
+            }
+          });
+
+          await searchInputField.type(product.code, {
+            delay: 300,
+          });
 
           await searchButtonElement.click();
 
