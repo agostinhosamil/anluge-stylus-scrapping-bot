@@ -173,17 +173,30 @@ const main = async () => {
 
           console.log(`[${product.name}] Getting main image url...`);
 
-          const mainImageElement = await page.waitForSelector("img#bigpic");
+          const mainImageUrl = await page.evaluate(() => {
+            const mainImageElement =
+              document.querySelector<HTMLImageElement>("img#bigpic");
 
-          if (mainImageElement) {
-            const mainImageUrl = await mainImageElement.getProperty("src");
+            if (!mainImageElement) {
+              return null;
+            }
+
+            return String(mainImageElement.src);
+          });
+
+          // const mainImageElement = await page.waitForSelector("img#bigpic");
+
+          console.log(`[${product.name}] Got main image url...`);
+
+          if (mainImageUrl && /\S/.test(mainImageUrl)) {
+            // const mainImageUrl = await mainImageElement.getProperty("src");
 
             console.log(
               `[${product.name}] Getting main image buffer object...`
             );
 
             const mainImageButterObject = await getImageFileElementFromUrl(
-              mainImageUrl.toString().replace(/^(JSHandle:)/i, "")
+              mainImageUrl // .toString().replace(/^(JSHandle:)/i, "")
             );
 
             const sanitizedProductName = product.name
@@ -225,6 +238,10 @@ const main = async () => {
 
             // TODO: Get Image Variants
           } else {
+            console.log(
+              `[${product.name}] Failure getting main image url (${mainImageUrl}).`
+            );
+
             setHistory(product, "failure");
           }
         } catch (err) {
