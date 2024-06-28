@@ -1,16 +1,9 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-
 import puppeteer from "puppeteer";
 
 import { env } from "./config/env";
 // import { testSaveFile } from "./test";
-import {
-  getHistory,
-  getImageFileElementFromUrl,
-  getProducts,
-  setHistory,
-} from "./utils";
+import { getHistory, getProducts, setHistory } from "./utils";
+import { saveImageFromUrl } from "./utils/saveImageFromByUrl";
 
 // testSaveFile();
 
@@ -111,19 +104,21 @@ const main = async () => {
 
           console.log(`[${product.name}] Typing search query...`);
 
-          await searchInputField.evaluate(() => {
+          await searchInputField.evaluate((element, productCode) => {
             const inputField = document.querySelector<HTMLInputElement>(
               "form#searchbox div.input-group input#pts_search_query_top"
             );
 
-            if (inputField) {
-              inputField.value = "";
-            }
-          });
+            console.log("\n\n\nproductCode => ", productCode, "\n\n\n\n");
 
-          await searchInputField.type(product.code, {
-            delay: 300,
-          });
+            if (inputField) {
+              inputField.value = productCode;
+            }
+          }, product.code);
+
+          // await searchInputField.type(product.code, {
+          //   delay: 300,
+          // });
 
           await searchButtonElement.click();
 
@@ -189,55 +184,32 @@ const main = async () => {
           console.log(`[${product.name}] Got main image url...`);
 
           if (mainImageUrl && /\S/.test(mainImageUrl)) {
-            // const mainImageUrl = await mainImageElement.getProperty("src");
+            await saveImageFromUrl(product, mainImageUrl);
+          } else {
+            await page.goBack({
+              waitUntil: "domcontentloaded",
+            });
 
-            console.log(
-              `[${product.name}] Getting main image buffer object...`
-            );
+            const alternateProductImageUrl = await page.evaluate(() => {
+              const alternateProductImageElement =
+                document.querySelector<HTMLImageElement>(
+                  "div.product-meta a.fancybox img.img_prod_list"
+                );
 
-            const mainImageButterObject = await getImageFileElementFromUrl(
-              mainImageUrl // .toString().replace(/^(JSHandle:)/i, "")
-            );
+              if (alternateProductImageElement) {
+                return /\S/.test(alternateProductImageElement.src)
+                  ? alternateProductImageElement.src
+                  : null;
+              }
 
-            const sanitizedProductName = product.name
-              .replaceAll(/\s+/g, "-")
-              .replaceAll(/[^a-zA-Z0-9_-]/g, "");
+              return null;
+            });
 
-            const imageName = `[${Date.now()}] ${sanitizedProductName} - (${encodeURIComponent(
-              product.code
-            )}).jpg`;
-
-            const imagePath = path.resolve(
-              __dirname,
-              "assets",
-              "images",
-              imageName
-            );
-
-            if (!mainImageButterObject) {
-              console.log(
-                `[${product.name}] Failed getting main image buffer object...`
-              );
-
-              setHistory(product, "failure");
-
+            if (alternateProductImageUrl) {
+              await saveImageFromUrl(product, alternateProductImageUrl);
               continue;
             }
 
-            console.log(`[${product.name}] Saving image...`);
-            // @ts-ignore
-            await fs.writeFile(imagePath, mainImageButterObject);
-
-            console.log(
-              `[${product.name}] Saved image at: ${imagePath}`.concat(
-                "\n".repeat(10)
-              )
-            );
-
-            setHistory(product);
-
-            // TODO: Get Image Variants
-          } else {
             console.log(
               `[${product.name}] Failure getting main image url (${mainImageUrl}).`
             );
