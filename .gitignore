@@ -11,3 +11,5 @@ src/cache/**/*
 
 src/logs/**/*
 !src/logs/.gitkeep
+
+failures.txt
