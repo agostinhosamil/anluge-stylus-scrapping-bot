@@ -4,6 +4,7 @@ import { env } from "./config/env";
 // import { testSaveFile } from "./test";
 import { getHistory, getProducts, setHistory } from "./utils";
 import { saveImageFromUrl } from "./utils/saveImageFromByUrl";
+import { saveProductPropsFromPage } from "./utils/saveProductPropsFromPage";
 
 // testSaveFile();
 
@@ -122,9 +123,9 @@ const main = async () => {
 
           await searchButtonElement.click();
 
-          await page.waitForNavigation({
-            waitUntil: "load",
-          });
+          // await page.waitForNavigation({
+          //   waitUntil: "load",
+          // });
 
           const productPageLinkElement = await page.waitForSelector(
             "h4.name > a.product-name"
@@ -185,7 +186,70 @@ const main = async () => {
 
           if (mainImageUrl && /\S/.test(mainImageUrl)) {
             await saveImageFromUrl(product, mainImageUrl);
+
+            console.log(`[${product.name}] Getting alternates images urls...`);
+
+            const productAlternatesImagesUrls = await page.evaluate(() => {
+              const productAlternatesImagesElements =
+                document.querySelectorAll<HTMLImageElement>(
+                  [
+                    // "div.primary_block",
+                    // "div.pb-left-column",
+                    // "div#views_block",
+                    "div#thumbs_list",
+                    "img",
+                  ].join(" ")
+                );
+
+              if (productAlternatesImagesElements.length >= 1) {
+                const productAlternatesImagesSources = Array.from(
+                  productAlternatesImagesElements
+                ).map((imageElement) => {
+                  const re = /([0-9]+)-cart_default/i;
+                  const reMatch = re.exec(imageElement.src);
+
+                  if (reMatch) {
+                    const [, imageSourceToken] = reMatch;
+
+                    return imageElement.src.replace(
+                      re,
+                      `${imageSourceToken}-thickbox_default`
+                    );
+                  }
+
+                  return imageElement.src;
+                });
+
+                return productAlternatesImagesSources;
+              }
+            });
+
+            if (productAlternatesImagesUrls instanceof Array) {
+              console.log(
+                `[${product.name}] Got alternates images url. Start saving.`
+              );
+
+              let imageIndex = -1;
+
+              for (const productAlternateImageUrl of productAlternatesImagesUrls) {
+                imageIndex++;
+
+                console.log(
+                  `\n[${product.name}] Saving alternate image #${imageIndex}...`
+                );
+                await saveImageFromUrl(product, productAlternateImageUrl);
+              }
+            } else {
+              console.log(
+                `[${product.name}] Failure getting alternate images or nothing found.`,
+                { productAlternatesImagesUrls }
+              );
+            }
+
+            await saveProductPropsFromPage(product, page);
           } else {
+            await saveProductPropsFromPage(product, page);
+
             await page.goBack({
               waitUntil: "domcontentloaded",
             });
@@ -228,6 +292,23 @@ const main = async () => {
   return browser;
 };
 
-main().then(() => {
-  // browser.close();
+main().then((browser) => {
+  console.log("\n\n\n\nEND\n\n\n\n");
+
+  const history = getHistory();
+
+  console.log(
+    `\n\n\n\n\n\nSuccesses: ${history.success.length}\nFailures: ${history.failure.length}`
+  );
+
+  console.log(`\n\n\n\n\nAll imported products images:`);
+  console.table(
+    history.success.map((product) => ({
+      code: product.code,
+      id: product.id,
+      name: product.name,
+    }))
+  );
+
+  browser.close();
 });

@@ -1,15 +1,21 @@
-import fs from "fs";
+import fs, { writeFileSync } from "fs";
 import { basename, resolve } from "node:path";
 
 import { axios } from "../services/axios";
 
-import { Product, Products } from "../types";
+import { Product, ProductProps, Products, ProductsProps } from "../types";
 
 const productsCacheFilePath = resolve(
   __dirname,
   "..",
   "cache",
   "products.json"
+);
+const productsPropsFilePath = resolve(
+  __dirname,
+  "..",
+  "cache",
+  "products-props.json"
 );
 const historyCacheFilePath = resolve(__dirname, "..", "cache", "history.json");
 
@@ -34,6 +40,45 @@ const getProductsFromCache = async (): Promise<Products> => {
   }
 
   return productsCacheObject as Products;
+};
+
+export const getProductsProps = (): ProductsProps => {
+  let props: ProductsProps = {};
+
+  try {
+    const productsPropsFileContent = fs.readFileSync(
+      productsPropsFilePath,
+      "utf8"
+    );
+
+    if (/\S/.test(productsPropsFileContent)) {
+      props = JSON.parse(productsPropsFileContent);
+    }
+  } catch (err) {
+    // pass
+  }
+
+  return props;
+};
+
+export const saveProductsProps = (productsProps: ProductsProps): void => {
+  const updatedProductsProps = {
+    ...getProductsProps(),
+    ...productsProps,
+  };
+
+  const updatedProductsPropsStr = JSON.stringify(updatedProductsProps, null, 2);
+
+  writeFileSync(productsPropsFilePath, updatedProductsPropsStr);
+};
+
+export const saveProductProps = (
+  product: Product,
+  props: ProductProps
+): void => {
+  saveProductsProps({
+    [product.id]: { product, props },
+  });
 };
 
 type HistoryState = keyof History;
